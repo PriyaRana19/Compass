@@ -15,17 +15,12 @@ let currentHeading = null;
 let targetBearing = null;
 let isMuted = false;
 let lastVibrationState = null;
-let lastSpokenCardinal = null;
 
 const cardinalPoints = [
   { name: 'N', angle: 0 },
-  { name: 'NE', angle: 45 },
   { name: 'E', angle: 90 },
-  { name: 'SE', angle: 135 },
   { name: 'S', angle: 180 },
-  { name: 'SW', angle: 225 },
   { name: 'W', angle: 270 },
-  { name: 'NW', angle: 315 },
 ];
 
 function normalizeAngle(angle) {
@@ -58,9 +53,7 @@ function getNearestCardinal(angle) {
 
 function speakCardinalDirection(name) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
-  if (lastSpokenCardinal === name) return;
 
-  lastSpokenCardinal = name;
   window.speechSynthesis.cancel();
 
   const spokenName = {
@@ -68,10 +61,6 @@ function speakCardinalDirection(name) {
     E: 'East',
     S: 'South',
     W: 'West',
-    NE: 'Northeast',
-    SE: 'Southeast',
-    SW: 'Southwest',
-    NW: 'Northwest',
   }[name] || name;
 
   const utterance = new SpeechSynthesisUtterance(spokenName);
