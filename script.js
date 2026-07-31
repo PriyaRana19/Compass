@@ -19,13 +19,9 @@ let lastSpokenCardinal = null;
 
 const cardinalPoints = [
   { name: 'N', angle: 0 },
-  { name: 'NE', angle: 45 },
   { name: 'E', angle: 90 },
-  { name: 'SE', angle: 135 },
   { name: 'S', angle: 180 },
-  { name: 'SW', angle: 225 },
   { name: 'W', angle: 270 },
-  { name: 'NW', angle: 315 },
 ];
 
 function normalizeAngle(angle) {
