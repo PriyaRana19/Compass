@@ -1,0 +1,121 @@
+:root {
+  color-scheme: dark;
+  background: #07111d;
+  color: #f4f7ff;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1c2d55 0%, #07111d 55%);
+}
+
+.app-shell {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px 18px 32px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+}
+
+p {
+  margin: 12px auto 0;
+  max-width: 40rem;
+  line-height: 1.7;
+  color: #b8c4df;
+}
+
+.status-card,
+.controls-card,
+.hint-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 18px;
+  backdrop-filter: blur(12px);
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.status-row:last-child {
+  border-bottom: none;
+}
+
+.status-row strong {
+  font-weight: 600;
+}
+
+#headingValue,
+#targetValue,
+#errorValue,
+#stateValue {
+  color: #d0e5ff;
+}
+
+button {
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #54b5ff 0%, #2b83f0 100%);
+  color: white;
+  margin-bottom: 12px;
+}
+
+.secondary-button {
+  background: rgba(255,255,255,0.08);
+  color: #e6efff;
+}
+
+ol {
+  padding-left: 18px;
+  margin: 0;
+  line-height: 1.8;
+}
+
+.note {
+  margin-top: 14px;
+  color: #9bb6d8;
+}
+
+@media (max-width: 420px) {
+  .app-shell {
+    padding: 20px 14px 28px;
+  }
+}
