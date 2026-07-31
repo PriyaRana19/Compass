@@ -3,6 +3,13 @@
   background: #07111d;
   color: #f4f7ff;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text: #f7fbff;
+  --muted: #dce7f7;
+  --accent: #6dc2ff;
+  --accent-strong: #2f85f3;
+  --surface: #10213b;
+  --surface-2: #183250;
+  --border: #2a4b6e;
 }
 
 * {
@@ -12,13 +19,14 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, #1c2d55 0%, #07111d 55%);
+  background: linear-gradient(180deg, #0a1627 0%, #07111d 100%);
+  line-height: 1.5;
 }
 
 .app-shell {
-  max-width: 520px;
+  max-width: 560px;
   margin: 0 auto;
-  padding: 24px 18px 32px;
+  padding: 24px 18px 36px;
 }
 
 header {
@@ -27,34 +35,38 @@ header {
 }
 
 h1 {
-  margin: 0;
+  margin: 0 0 8px;
   font-size: clamp(2rem, 5vw, 2.8rem);
+  letter-spacing: 0.01em;
 }
 
 p {
-  margin: 12px auto 0;
+  margin: 0 auto;
   max-width: 40rem;
   line-height: 1.7;
-  color: #b8c4df;
+  color: var(--muted);
+  font-size: 1rem;
 }
 
 .status-card,
 .controls-card,
 .hint-card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(16, 33, 59, 0.95);
+  border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 18px;
+  padding: 18px 20px;
   margin-bottom: 18px;
-  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
 
 .status-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 16px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 1rem;
 }
 
 .status-row:last-child {
@@ -62,24 +74,51 @@ p {
 }
 
 .status-row strong {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text);
 }
 
 #headingValue,
 #targetValue,
 #errorValue,
-#stateValue {
-  color: #d0e5ff;
+#stateValue,
+#directionValue {
+  color: #dff2ff;
+  text-align: right;
+  font-weight: 600;
+}
+
+.status-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.direction-indicator {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-weight: 700;
+  color: #f7fbff;
+  text-align: center;
 }
 
 button {
   width: 100%;
   border: none;
-  border-radius: 14px;
-  padding: 14px 18px;
+  border-radius: 16px;
+  padding: 15px 18px;
   font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 180ms ease, background-color 180ms ease;
+  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+  min-height: 48px;
+}
+
+button:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
 }
 
 button:hover {
@@ -87,35 +126,44 @@ button:hover {
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #54b5ff 0%, #2b83f0 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: white;
   margin-bottom: 12px;
+  box-shadow: 0 6px 16px rgba(47, 133, 243, 0.3);
 }
 
 .secondary-button {
-  background: rgba(255,255,255,0.08);
-  color: #e6efff;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.12);
 }
 
 ol {
-  padding-left: 18px;
+  padding-left: 22px;
   margin: 0;
   line-height: 1.8;
+  color: var(--muted);
 }
 
 .note {
   margin-top: 14px;
-  color: #9bb6d8;
+  color: #bcd2ea;
 }
 
 @media (max-width: 420px) {
   .app-shell {
     padding: 20px 14px 28px;
+  }
+
+  .status-card,
+  .controls-card,
+  .hint-card {
+    padding: 16px;
   }
 }

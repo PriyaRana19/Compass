@@ -13,10 +13,11 @@
       <p>Hold your phone flat and point toward the target direction. Sound plays when you are off by 4° or more.</p>
     </header>
 
-    <section class="status-card">
+    <section class="status-card" aria-labelledby="status-heading">
+      <h2 id="status-heading">Compass status</h2>
       <div class="status-row">
         <strong>Current heading</strong>
-        <span id="headingValue">—</span>
+        <span id="headingValue" aria-live="polite">—</span>
       </div>
       <div class="status-row">
         <strong>Nearest direction</strong>
@@ -24,22 +25,26 @@
       </div>
       <div class="status-row">
         <strong>Target bearing</strong>
-        <span id="targetValue">—</span>
+        <span id="targetValue" aria-live="polite">—</span>
       </div>
       <div class="status-row">
         <strong>Angular error</strong>
-        <span id="errorValue">—</span>
+        <span id="errorValue" aria-live="polite">—</span>
       </div>
       <div class="status-row">
         <strong>Compass state</strong>
-        <span id="stateValue">Waiting for permission</span>
+        <span id="stateValue" aria-live="polite">Waiting for permission</span>
+      </div>
+      <div class="status-row">
+        <strong>Direction</strong>
+        <span id="directionValue" aria-live="polite">—</span>
       </div>
     </section>
 
     <section class="controls-card">
-      <button id="enableButton" class="primary-button">Enable orientation</button>
-      <button id="setTargetButton" class="secondary-button" disabled>Set target to current heading</button>
-      <button id="muteButton" class="secondary-button" disabled>Mute sound</button>
+      <button id="enableButton" class="primary-button" aria-label="Enable orientation sensor">Enable orientation</button>
+      <button id="setTargetButton" class="secondary-button" disabled aria-label="Set current heading as target">Set target to current heading</button>
+      <button id="muteButton" class="secondary-button" disabled aria-label="Mute or unmute sound">Mute sound</button>
     </section>
 
     <section class="hint-card">

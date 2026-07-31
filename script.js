@@ -3,6 +3,7 @@ const cardinalValue = document.getElementById('cardinalValue');
 const targetValue = document.getElementById('targetValue');
 const errorValue = document.getElementById('errorValue');
 const stateValue = document.getElementById('stateValue');
+const directionValue = document.getElementById('directionValue');
 const enableButton = document.getElementById('enableButton');
 const setTargetButton = document.getElementById('setTargetButton');
 const muteButton = document.getElementById('muteButton');
@@ -13,6 +14,7 @@ let gainNode;
 let currentHeading = null;
 let targetBearing = null;
 let isMuted = false;
+let lastVibrationState = null;
 let lastSpokenCardinal = null;
 
 const cardinalPoints = [
@@ -91,6 +93,7 @@ function updateStatus() {
 
   if (targetBearing === null) {
     errorValue.textContent = '—';
+    directionValue.textContent = '—';
 
     const nearestCardinal = getNearestCardinal(currentHeading);
     const absCardinalError = Math.abs(nearestCardinal.error);
@@ -115,18 +118,23 @@ function updateStatus() {
 
   const error = computeAngularError(currentHeading, targetBearing);
   const absError = Math.abs(error);
-  errorValue.textContent = `${error.toFixed(0)}° ${error === 0 ? '(on target)' : error > 0 ? 'right' : 'left'}`;
+  const direction = error === 0 ? 'On target' : error > 0 ? 'Turn right' : 'Turn left';
+  errorValue.textContent = `${error.toFixed(0)}°`;
+  directionValue.textContent = direction;
 
   const shouldPlay = absError > 0 && absError < 5;
 
   if (shouldPlay && !isMuted) {
     playTone(absError);
-    stateValue.textContent = 'Off-target – sound active';
+    triggerVibration(absError);
+    stateValue.textContent = 'Off-target – sound and vibration active';
   } else if (absError >= 5) {
     stopTone();
+    triggerVibration(0, true);
     stateValue.textContent = 'Off-target – no sound';
   } else {
     stopTone();
+    triggerVibration(0, false);
     stateValue.textContent = 'On target';
   }
 }
@@ -158,6 +166,32 @@ function stopTone() {
   gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.015);
 }
 
+function triggerVibration(errorMagnitude, isOutOfRange = false) {
+  if (!('vibrate' in navigator)) return;
+
+  if (isOutOfRange) {
+    if (lastVibrationState !== 'out-of-range') {
+      navigator.vibrate(0);
+      lastVibrationState = 'out-of-range';
+    }
+    return;
+  }
+
+  if (errorMagnitude <= 0) {
+    if (lastVibrationState !== 'on-target') {
+      navigator.vibrate(20);
+      lastVibrationState = 'on-target';
+    }
+    return;
+  }
+
+  const duration = Math.min(120, 30 + errorMagnitude * 4);
+  if (lastVibrationState !== 'off-target') {
+    navigator.vibrate(duration);
+    lastVibrationState = 'off-target';
+  }
+}
+
 function handleOrientation(event) {
   let heading = null;
 
@@ -179,7 +213,17 @@ function handleOrientation(event) {
 }
 
 async function enableCompass() {
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+  if (!window.isSecureContext || window.location.protocol === 'file:') {
+    stateValue.textContent = 'Open this app from a local server or HTTPS for compass access.';
+    return;
+  }
+
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    stateValue.textContent = 'This browser does not support device orientation.';
+    return;
+  }
+
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const response = await DeviceOrientationEvent.requestPermission();
       if (response !== 'granted') {
