@@ -2,6 +2,7 @@ const headingValue = document.getElementById('headingValue');
 const targetValue = document.getElementById('targetValue');
 const errorValue = document.getElementById('errorValue');
 const stateValue = document.getElementById('stateValue');
+const directionValue = document.getElementById('directionValue');
 const enableButton = document.getElementById('enableButton');
 const setTargetButton = document.getElementById('setTargetButton');
 const muteButton = document.getElementById('muteButton');
@@ -28,12 +29,15 @@ function updateStatus() {
 
   if (currentHeading === null || targetBearing === null) {
     errorValue.textContent = '—';
+    directionValue.textContent = '—';
     return;
   }
 
   const error = computeAngularError(currentHeading, targetBearing);
   const absError = Math.abs(error);
-  errorValue.textContent = `${error.toFixed(0)}° ${error === 0 ? '(on target)' : error > 0 ? 'right' : 'left'}`;
+  const direction = error === 0 ? 'On target' : error > 0 ? 'Turn right' : 'Turn left';
+  errorValue.textContent = `${error.toFixed(0)}°`;
+  directionValue.textContent = direction;
 
   const shouldPlay = absError > 0 && absError < 5;
 
@@ -97,7 +101,17 @@ function handleOrientation(event) {
 }
 
 async function enableCompass() {
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+  if (!window.isSecureContext || window.location.protocol === 'file:') {
+    stateValue.textContent = 'Open this app from a local server or HTTPS for compass access.';
+    return;
+  }
+
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    stateValue.textContent = 'This browser does not support device orientation.';
+    return;
+  }
+
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const response = await DeviceOrientationEvent.requestPermission();
       if (response !== 'granted') {
