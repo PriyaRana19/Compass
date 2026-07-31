@@ -1,4 +1,5 @@
 const headingValue = document.getElementById('headingValue');
+const cardinalValue = document.getElementById('cardinalValue');
 const targetValue = document.getElementById('targetValue');
 const errorValue = document.getElementById('errorValue');
 const stateValue = document.getElementById('stateValue');
@@ -12,6 +13,18 @@ let gainNode;
 let currentHeading = null;
 let targetBearing = null;
 let isMuted = false;
+let lastSpokenCardinal = null;
+
+const cardinalPoints = [
+  { name: 'N', angle: 0 },
+  { name: 'NE', angle: 45 },
+  { name: 'E', angle: 90 },
+  { name: 'SE', angle: 135 },
+  { name: 'S', angle: 180 },
+  { name: 'SW', angle: 225 },
+  { name: 'W', angle: 270 },
+  { name: 'NW', angle: 315 },
+];
 
 function normalizeAngle(angle) {
   return ((angle % 360) + 360) % 360;
@@ -22,12 +35,81 @@ function computeAngularError(current, target) {
   return delta;
 }
 
+function getDirectionLabel(angle) {
+  const index = Math.round(normalizeAngle(angle) / 45) % 8;
+  return cardinalPoints[index].name;
+}
+
+function getNearestCardinal(angle) {
+  const normalized = normalizeAngle(angle);
+  let best = null;
+
+  for (const point of cardinalPoints) {
+    const error = Math.abs(normalizeAngle(normalized - point.angle + 540) - 180);
+    if (best === null || error < best.error) {
+      best = { name: point.name, angle: point.angle, error };
+    }
+  }
+
+  return best;
+}
+
+function speakCardinalDirection(name) {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) return;
+  if (lastSpokenCardinal === name) return;
+
+  lastSpokenCardinal = name;
+  window.speechSynthesis.cancel();
+
+  const spokenName = {
+    N: 'North',
+    E: 'East',
+    S: 'South',
+    W: 'West',
+    NE: 'Northeast',
+    SE: 'Southeast',
+    SW: 'Southwest',
+    NW: 'Northwest',
+  }[name] || name;
+
+  const utterance = new SpeechSynthesisUtterance(spokenName);
+  utterance.lang = 'en-US';
+  window.speechSynthesis.speak(utterance);
+}
+
 function updateStatus() {
   headingValue.textContent = currentHeading === null ? '—' : `${currentHeading.toFixed(0)}°`;
+  cardinalValue.textContent = currentHeading === null ? '—' : getDirectionLabel(currentHeading);
   targetValue.textContent = targetBearing === null ? '—' : `${targetBearing.toFixed(0)}°`;
 
-  if (currentHeading === null || targetBearing === null) {
+  if (currentHeading === null) {
     errorValue.textContent = '—';
+    stopTone();
+    stateValue.textContent = 'Waiting for compass data...';
+    return;
+  }
+
+  if (targetBearing === null) {
+    errorValue.textContent = '—';
+
+    const nearestCardinal = getNearestCardinal(currentHeading);
+    const absCardinalError = Math.abs(nearestCardinal.error);
+    const exactCardinal = absCardinalError <= 0.5;
+
+    if (exactCardinal && !isMuted) {
+      speakCardinalDirection(nearestCardinal.name);
+    }
+
+    if (absCardinalError <= 5 && !isMuted) {
+      playTone(5 - absCardinalError + 1);
+      stateValue.textContent = exactCardinal
+        ? `On ${nearestCardinal.name}`
+        : `Near ${nearestCardinal.name} – sound active`;
+    } else {
+      stopTone();
+      stateValue.textContent = `Heading ${nearestCardinal.name}`;
+    }
+
     return;
   }
 
