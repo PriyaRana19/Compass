@@ -13,6 +13,7 @@ let gainNode;
 let currentHeading = null;
 let targetBearing = null;
 let isMuted = false;
+let lastVibrationState = null;
 
 function normalizeAngle(angle) {
   return ((angle % 360) + 360) % 360;
@@ -43,12 +44,15 @@ function updateStatus() {
 
   if (shouldPlay && !isMuted) {
     playTone(absError);
-    stateValue.textContent = 'Off-target – sound active';
+    triggerVibration(absError);
+    stateValue.textContent = 'Off-target – sound and vibration active';
   } else if (absError >= 5) {
     stopTone();
+    triggerVibration(0, true);
     stateValue.textContent = 'Off-target – no sound';
   } else {
     stopTone();
+    triggerVibration(0, false);
     stateValue.textContent = 'On target';
   }
 }
@@ -78,6 +82,32 @@ function playTone(errorMagnitude) {
 function stopTone() {
   if (!oscillator || !gainNode) return;
   gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.015);
+}
+
+function triggerVibration(errorMagnitude, isOutOfRange = false) {
+  if (!('vibrate' in navigator)) return;
+
+  if (isOutOfRange) {
+    if (lastVibrationState !== 'out-of-range') {
+      navigator.vibrate(0);
+      lastVibrationState = 'out-of-range';
+    }
+    return;
+  }
+
+  if (errorMagnitude <= 0) {
+    if (lastVibrationState !== 'on-target') {
+      navigator.vibrate(20);
+      lastVibrationState = 'on-target';
+    }
+    return;
+  }
+
+  const duration = Math.min(120, 30 + errorMagnitude * 4);
+  if (lastVibrationState !== 'off-target') {
+    navigator.vibrate(duration);
+    lastVibrationState = 'off-target';
+  }
 }
 
 function handleOrientation(event) {
