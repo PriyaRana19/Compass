@@ -236,7 +236,11 @@ function updateStatus() {
     const absCardinalError = Math.abs(nearestCardinal.error);
     const exactCardinal = absCardinalError <= 0.5;
 
-    if (!isMuted && lastSpokenCardinal !== nearestCardinal.name) {
+    if (!exactCardinal) {
+      lastSpokenCardinal = null;
+    }
+
+    if (exactCardinal && !isMuted && lastSpokenCardinal !== nearestCardinal.name) {
       speakCardinalDirection(nearestCardinal.name);
       lastSpokenCardinal = nearestCardinal.name;
     }
