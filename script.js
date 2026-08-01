@@ -64,10 +64,6 @@ function speakCardinalDirection(name) {
     E: 'East',
     S: 'South',
     W: 'West',
-    NE: 'Northeast',
-    SE: 'Southeast',
-    SW: 'Southwest',
-    NW: 'Northwest',
   }[name] || name;
 
   const utterance = new SpeechSynthesisUtterance(spokenName);
