@@ -1,6 +1,7 @@
 const headingValue = document.getElementById('headingValue');
 const cardinalValue = document.getElementById('cardinalValue');
 const targetValue = document.getElementById('targetValue');
+const orientationValue = document.getElementById('orientationValue');
 const errorValue = document.getElementById('errorValue');
 const stateValue = document.getElementById('stateValue');
 const directionValue = document.getElementById('directionValue');
@@ -18,6 +19,9 @@ let currentHeading = null;
 let targetBearing = null;
 let isMuted = false;
 let lastVibrationState = null;
+let orientationOk = null;
+let lastOrientationState = null;
+let lastSpokenMessage = '';
 let currentLocation = null;
 let declinationOffset = 0; 
 let declinationStatusMessage = '';
@@ -69,6 +73,7 @@ async function getLocation() {
 
 function normalizeAngle(angle) {
   return ((angle % 360) + 360) % 360;
+  return ((angle % 360) + 360) % 360;
 }
 
 function getTrueHeading(magneticHeading, declination) {
@@ -78,6 +83,23 @@ function getTrueHeading(magneticHeading, declination) {
 function computeAngularError(current, target) {
   const delta = normalizeAngle(current - target + 540) - 180;
   return delta;
+}
+
+function speak(message) {
+  if (!('speechSynthesis' in window) || !message || isMuted) return;
+  if (message === lastSpokenMessage) return;
+  lastSpokenMessage = message;
+  const utterance = new SpeechSynthesisUtterance(message);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utterance);
+}
+
+function getOrientationStatus(event) {
+  if (typeof event.beta !== 'number' || typeof event.gamma !== 'number') {
+    return null;
+  }
+
+  return Math.abs(event.beta) <= 25 && Math.abs(event.gamma) <= 25;
 }
 
 function getDirectionLabel(angle) {
@@ -159,12 +181,21 @@ function updateStatus() {
   errorValue.textContent = `${error.toFixed(0)}°`;
   directionValue.textContent = direction;
 
+  if (orientationOk === false) {
+    stopTone();
+    triggerVibration(0, false);
+    stateValue.textContent = 'Please hold the phone flat.';
+    speak('Please hold the phone flat');
+    return;
+  }
+
   const shouldPlay = absError > 0 && absError < 5;
 
   if (shouldPlay && !isMuted) {
     playTone(absError);
     triggerVibration(absError);
     stateValue.textContent = 'Off-target – sound and vibration active';
+    speak(direction);
   } else if (absError >= 5) {
     stopTone();
     triggerVibration(0, true);
@@ -173,6 +204,7 @@ function updateStatus() {
     stopTone();
     triggerVibration(0, false);
     stateValue.textContent = 'On target';
+    speak('On target');
   }
 }
 
@@ -234,10 +266,20 @@ function handleOrientation(event) {
 
   if (typeof event.webkitCompassHeading === 'number') {
     heading = event.webkitCompassHeading;
+  } else if (event.absolute === true && typeof event.alpha === 'number') {
+    heading = 360 - event.alpha;
   } else if (typeof event.alpha === 'number') {
     heading = event.alpha;
   }
-
+  orientationOk = getOrientationStatus(event);
+  if (orientationOk !== lastOrientationState) {
+    lastOrientationState = orientationOk;
+    if (orientationOk === false) {
+      speak('Please hold the phone flat');
+    } else if (orientationOk === true) {
+      speak('Phone is flat enough');
+    }
+  }
   if (heading === null || Number.isNaN(heading)) {
     stateValue.textContent = 'Compass data unavailable';
     return;
