@@ -6,6 +6,7 @@ const orientationValue = document.getElementById('orientationValue');
 const errorValue = document.getElementById('errorValue');
 const stateValue = document.getElementById('stateValue');
 const directionValue = document.getElementById('directionValue');
+const lineOfSightValue = document.getElementById('lineOfSightValue');
 const enableButton = document.getElementById('enableButton');
 const setTargetButton = document.getElementById('setTargetButton');
 const muteButton = document.getElementById('muteButton');
@@ -29,9 +30,17 @@ let lastVibrationState = null;
 let orientationOk = null;
 let lastOrientationState = null;
 let lastSpokenMessage = '';
+let lastSpokenCardinal = null;
 let currentLocation = null;
 let declinationOffset = 0;
 let declinationStatusMessage = '';
+
+let placeService = null;
+let lastLineOfSightName = null;
+let lastLineOfSightQueryTime = 0;
+let lastLineOfSightAnnouncementTime = 0;
+const LINE_OF_SIGHT_RADIUS_METERS = 120;
+const LINE_OF_SIGHT_ANGLE_THRESHOLD = 18;
 
 let mapsReady = false;
 let RouteClass = null;
@@ -116,9 +125,9 @@ function computeAngularError(current, target) {
   return delta;
 }
 
-function speak(message) {
+function speak(message, { force = false } = {}) {
   if (!('speechSynthesis' in window) || !message || isMuted) return;
-  if (message === lastSpokenMessage) return;
+  if (!force && message === lastSpokenMessage) return;
   lastSpokenMessage = message;
   const utterance = new SpeechSynthesisUtterance(message);
   speechSynthesis.cancel();
@@ -203,6 +212,7 @@ function updateStatus() {
 
   if (currentHeading === null) {
     errorValue.textContent = '—';
+    lineOfSightValue.textContent = '—';
     stopTone();
     stateValue.textContent = 'Waiting for compass data...';
     return;
@@ -216,8 +226,13 @@ function updateStatus() {
     const absCardinalError = Math.abs(nearestCardinal.error);
     const exactCardinal = absCardinalError <= 0.5;
 
-    if (exactCardinal && !isMuted) {
+    if (!exactCardinal) {
+      lastSpokenCardinal = null;
+    }
+
+    if (exactCardinal && !isMuted && lastSpokenCardinal !== nearestCardinal.name) {
       speakCardinalDirection(nearestCardinal.name);
+      lastSpokenCardinal = nearestCardinal.name;
     }
 
     if (absCardinalError <= 5 && !isMuted) {
@@ -342,8 +357,75 @@ function handleOrientation(event) {
   }
 
   updateStatus();
+  updateLineOfSight();
   setTargetButton.disabled = false;
   muteButton.disabled = false;
+}
+
+function getBestLineOfSightPlace(results) {
+  if (!Array.isArray(results) || results.length === 0 || !currentLocation || currentHeading === null) {
+    return null;
+  }
+
+  const here = new google.maps.LatLng(currentLocation.latitude, currentLocation.longitude);
+  let best = null;
+
+  for (const place of results) {
+    if (!place.geometry || !place.geometry.location || !place.name) continue;
+
+    const bearingToPlace = normalizeAngle(
+      google.maps.geometry.spherical.computeHeading(here, place.geometry.location)
+    );
+    const error = Math.abs(normalizeAngle(currentHeading - bearingToPlace + 540) - 180);
+    if (error > LINE_OF_SIGHT_ANGLE_THRESHOLD) continue;
+
+    const distance = google.maps.geometry.spherical.computeDistanceBetween(here, place.geometry.location);
+    if (!best || error < best.error || (error === best.error && distance < best.distance)) {
+      best = { name: place.name, error, distance };
+    }
+  }
+
+  return best;
+}
+
+function updateLineOfSight() {
+  const now = Date.now();
+  if (!mapsReady || !currentLocation || currentHeading === null) return;
+  if (now - lastLineOfSightQueryTime < 5000) return;
+
+  lastLineOfSightQueryTime = now;
+  if (!placeService && window.google && google.maps && google.maps.places) {
+    placeService = new google.maps.places.PlacesService(mapContainer);
+  }
+
+  if (!placeService) return;
+
+  placeService.nearbySearch(
+    {
+      location: currentLocation,
+      radius: LINE_OF_SIGHT_RADIUS_METERS,
+      type: ['establishment'],
+    },
+    (results, status) => {
+      if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
+        lineOfSightValue.textContent = '—';
+        return;
+      }
+
+      const sight = getBestLineOfSightPlace(results);
+      if (!sight) {
+        lineOfSightValue.textContent = '—';
+        return;
+      }
+
+      lineOfSightValue.textContent = sight.name;
+      if (sight.name !== lastLineOfSightName || now - lastLineOfSightAnnouncementTime > 20000) {
+        speak(`This is ${sight.name}`, { force: true });
+        lastLineOfSightName = sight.name;
+        lastLineOfSightAnnouncementTime = now;
+      }
+    }
+  );
 }
 
 async function enableCompass() {
@@ -399,7 +481,7 @@ muteButton.addEventListener('click', () => {
 function loadGoogleMaps() {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,places`;
     script.async = true;
     script.defer = true;
     script.onload = resolve;
