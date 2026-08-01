@@ -282,11 +282,18 @@ function updateStatus() {
 }
 
 function ensureAudioContext() {
-  if (audioContext) return;
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  gainNode = audioContext.createGain();
-  gainNode.gain.value = 0;
-  gainNode.connect(audioContext.destination);
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.connect(audioContext.destination);
+  }
+
+  if (audioContext.state === 'suspended') {
+    audioContext.resume().catch(error => {
+      console.warn('AudioContext resume failed:', error);
+    });
+  }
 }
 
 function playTone(errorMagnitude) {
