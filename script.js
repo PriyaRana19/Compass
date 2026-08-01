@@ -187,7 +187,7 @@ function handleOrientation(event) {
   if (typeof event.webkitCompassHeading === 'number') {
     heading = event.webkitCompassHeading;
   } else if (typeof event.alpha === 'number') {
-    heading = 360 - event.alpha;
+    heading = event.alpha;
   }
 
   if (heading === null || Number.isNaN(heading)) {
