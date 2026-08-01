@@ -1,3 +1,4 @@
+const locationValue = document.getElementById('locationValue');
 const headingValue = document.getElementById('headingValue');
 const cardinalValue = document.getElementById('cardinalValue');
 const targetValue = document.getElementById('targetValue');
@@ -53,6 +54,11 @@ const cardinalPoints = [
   { name: 'W', angle: 270 },
 ];
 
+function updateLocationDisplay(latitude, longitude, accuracy) {
+  const accuracyText = typeof accuracy === 'number' ? ` (±${accuracy.toFixed(0)} m)` : '';
+  locationValue.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}${accuracyText}`;
+}
+
 async function getLocation() {
   if (!navigator.geolocation) {
     throw new Error('Geolocation is not supported by this browser.');
@@ -65,6 +71,8 @@ async function getLocation() {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
+
+        updateLocationDisplay(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
 
         declinationOffset = getDeclination(
           currentLocation.latitude,
@@ -413,7 +421,19 @@ function ensureMap(center) {
     zoomControl: true,
     clickableIcons: false,
   });
-  originMarker = new MarkerClass({ map, position: center, title: 'You' });
+  originMarker = new MarkerClass({
+    map,
+    position: center,
+    title: 'You',
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 8,
+      fillColor: '#4285F4',
+      fillOpacity: 1,
+      strokeColor: '#ffffff',
+      strokeWeight: 2,
+    },
+  });
 }
 
 function drawRoute(steps, origin) {
@@ -567,6 +587,7 @@ async function requestDirections() {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       };
+      updateLocationDisplay(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
       updateNavigation();
     },
     error => console.warn('Navigation position error:', error),
