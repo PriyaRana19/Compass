@@ -24,7 +24,7 @@ const cardinalPoints = [
 ];
 
 function normalizeAngle(angle) {
-  return ((angle % 360) + 360) % 360;
+  return (angle % 360)
 }
 
 function computeAngularError(current, target) {
