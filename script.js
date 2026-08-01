@@ -155,7 +155,7 @@ function getDeviceHeading(event) {
   }
 
   const screenAngle = getScreenOrientationAngle();
-  const heading = normalizeAngle(360 - event.alpha + screenAngle);
+  const heading = normalizeAngle(360 - event.alpha + screenAngle);  // Add back the 360 -
 
   return { heading, isTrueNorth: false };
 }
