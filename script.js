@@ -33,7 +33,7 @@ function computeAngularError(current, target) {
 }
 
 function getDirectionLabel(angle) {
-  const index = Math.round(normalizeAngle(angle) / 45) % 8;
+  const index = Math.round(normalizeAngle(angle) / 90) % 4;
   return cardinalPoints[index].name;
 }
 
