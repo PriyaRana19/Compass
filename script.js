@@ -186,8 +186,8 @@ function handleOrientation(event) {
 
   if (typeof event.webkitCompassHeading === 'number') {
     heading = event.webkitCompassHeading;
-  } else if (typeof event.alpha === 'number') {
-    heading = event.alpha;
+  } else if (event.absolute === true && typeof event.alpha === 'number') {
+    heading = 360 - event.alpha;
   }
 
   if (heading === null || Number.isNaN(heading)) {
@@ -225,7 +225,11 @@ async function enableCompass() {
     }
   }
 
-  window.addEventListener('deviceorientation', handleOrientation, true);
+  if ('ondeviceorientationabsolute' in window) {
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+  } else {
+    window.addEventListener('deviceorientation', handleOrientation, true);
+  }
   stateValue.textContent = 'Waiting for compass data...';
   enableButton.disabled = true;
 }
