@@ -19,6 +19,7 @@ let lastVibrationState = null;
 let orientationOk = null;
 let lastOrientationState = null;
 let lastSpokenMessage = '';
+let lastSpokenCardinal = null;
 
 const cardinalPoints = [
   { name: 'N', angle: 0 },
@@ -109,8 +110,13 @@ function updateStatus() {
     const absCardinalError = Math.abs(nearestCardinal.error);
     const exactCardinal = absCardinalError <= 0.5;
 
-    if (exactCardinal && !isMuted) {
+    if (!exactCardinal) {
+      lastSpokenCardinal = null;
+    }
+
+    if (exactCardinal && !isMuted && lastSpokenCardinal !== nearestCardinal.name) {
       speakCardinalDirection(nearestCardinal.name);
+      lastSpokenCardinal = nearestCardinal.name;
     }
 
     if (absCardinalError <= 5 && !isMuted) {
@@ -286,3 +292,4 @@ muteButton.addEventListener('click', () => {
   muteButton.textContent = isMuted ? 'Unmute sound' : 'Mute sound';
   updateStatus();
 });
+
