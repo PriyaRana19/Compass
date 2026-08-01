@@ -9,8 +9,7 @@ const enableButton = document.getElementById('enableButton');
 const setTargetButton = document.getElementById('setTargetButton');
 const muteButton = document.getElementById('muteButton');
 
-import Geomag from 'geomag';
-const declination = new Geomag().declination(lat, lon, new Date());
+import { field as geomagneticField } from 'https://cdn.jsdelivr.net/npm/geomag@1.0.0/dist/geomag.m.js';
 
 let audioContext;
 let oscillator;
@@ -73,11 +72,14 @@ async function getLocation() {
 
 function normalizeAngle(angle) {
   return ((angle % 360) + 360) % 360;
-  return ((angle % 360) + 360) % 360;
+}
+
+function getDeclination(lat, lon) {
+  return geomagneticField(lat, lon).declination;
 }
 
 function getTrueHeading(magneticHeading, declination) {
-  return normalizeAngle(magneticHeading + declination);
+  return normalizeAngle(magneticHeading - declination);
 }
 
 function computeAngularError(current, target) {
@@ -102,8 +104,35 @@ function getOrientationStatus(event) {
   return Math.abs(event.beta) <= 25 && Math.abs(event.gamma) <= 25;
 }
 
+function getScreenOrientationAngle() {
+  if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.angle === 'number') {
+    return screen.orientation.angle;
+  }
+
+  if (typeof window.orientation === 'number') {
+    return window.orientation;
+  }
+
+  return 0;
+}
+
+function getDeviceHeading(event) {
+  if (typeof event.webkitCompassHeading === 'number') {
+    return { heading: normalizeAngle(event.webkitCompassHeading), isTrueNorth: false };
+  }
+
+  if (typeof event.alpha !== 'number') {
+    return null;
+  }
+
+  const screenAngle = getScreenOrientationAngle();
+  const heading = normalizeAngle(360 - event.alpha + screenAngle);
+
+  return { heading, isTrueNorth: false };
+}
+
 function getDirectionLabel(angle) {
-  const index = Math.round(normalizeAngle(angle) / 90) % 4;
+  const index = Math.floor((normalizeAngle(angle) + 45) / 90) % 4;
   return cardinalPoints[index].name;
 }
 
@@ -262,15 +291,7 @@ function triggerVibration(errorMagnitude, isOutOfRange = false) {
 }
 
 function handleOrientation(event) {
-  let heading = null;
-
-  if (typeof event.webkitCompassHeading === 'number') {
-    heading = event.webkitCompassHeading;
-  } else if (event.absolute === true && typeof event.alpha === 'number') {
-    heading = 360 - event.alpha;
-  } else if (typeof event.alpha === 'number') {
-    heading = event.alpha;
-  }
+  const headingResult = getDeviceHeading(event);
   orientationOk = getOrientationStatus(event);
   if (orientationOk !== lastOrientationState) {
     lastOrientationState = orientationOk;
@@ -280,12 +301,17 @@ function handleOrientation(event) {
       speak('Phone is flat enough');
     }
   }
-  if (heading === null || Number.isNaN(heading)) {
+
+  if (!headingResult || Number.isNaN(headingResult.heading)) {
     stateValue.textContent = 'Compass data unavailable';
     return;
   }
 
-  currentHeading = getTrueHeading(heading, declinationOffset);
+  currentHeading = headingResult.heading;
+  if (!headingResult.isTrueNorth) {
+    currentHeading = getTrueHeading(currentHeading, declinationOffset);
+  }
+
   updateStatus();
   setTargetButton.disabled = false;
   muteButton.disabled = false;
