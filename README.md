@@ -1,4 +1,4 @@
-# Compass Overflow
+# Compass Overthere
 
 A simple smartphone web app that emits sound when the current heading is off by 4 degrees or more from the target bearing. Includes walking directions to a typed destination, with the same audio/speech/vibration cues guiding you toward each turn.
 
