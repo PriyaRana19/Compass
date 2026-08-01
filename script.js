@@ -125,13 +125,20 @@ function computeAngularError(current, target) {
   return delta;
 }
 
-function speak(message, { force = false } = {}) {
+function speak(message) {
   if (!('speechSynthesis' in window) || !message || isMuted) return;
-  if (!force && message === lastSpokenMessage) return;
+  if (message === lastSpokenMessage) return;
   lastSpokenMessage = message;
+  
+  // Resume audio context on iOS (required for speech)
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+  
   const utterance = new SpeechSynthesisUtterance(message);
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utterance);
+  utterance.lang = 'en-US';
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 }
 
 function getOrientationStatus(event) {
@@ -156,7 +163,7 @@ function getScreenOrientationAngle() {
 
 function getDeviceHeading(event) {
   if (typeof event.webkitCompassHeading === 'number') {
-    return { heading: normalizeAngle(event.webkitCompassHeading), isTrueNorth: false };
+    return { heading: normalizeAngle(event.webkitCompassHeading + 180), isTrueNorth: false };
   }
 
   if (typeof event.alpha !== 'number') {
@@ -164,7 +171,7 @@ function getDeviceHeading(event) {
   }
 
   const screenAngle = getScreenOrientationAngle();
-  const heading = normalizeAngle(360 - event.alpha + screenAngle);  // Add back the 360 -
+  const heading = normalizeAngle(360 - event.alpha - screenAngle + 180);  // Add + 180
 
   return { heading, isTrueNorth: false };
 }
@@ -282,18 +289,11 @@ function updateStatus() {
 }
 
 function ensureAudioContext() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    gainNode = audioContext.createGain();
-    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-    gainNode.connect(audioContext.destination);
-  }
-
-  if (audioContext.state === 'suspended') {
-    audioContext.resume().catch(error => {
-      console.warn('AudioContext resume failed:', error);
-    });
-  }
+  if (audioContext) return;
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  gainNode = audioContext.createGain();
+  gainNode.gain.value = 0;
+  gainNode.connect(audioContext.destination);
 }
 
 function playTone(errorMagnitude) {
@@ -466,7 +466,6 @@ async function enableCompass() {
     console.warn('Unable to access location:', error);
   }
 
-  ensureAudioContext();
   window.addEventListener('deviceorientation', handleOrientation, true);
   stateValue.textContent = declinationStatusMessage || 'Waiting for compass data...';
   enableButton.disabled = true;
