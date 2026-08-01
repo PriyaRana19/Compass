@@ -15,6 +15,8 @@ const getDirectionsButton = document.getElementById('getDirectionsButton');
 const cancelRouteButton = document.getElementById('cancelRouteButton');
 const nextStepValue = document.getElementById('nextStepValue');
 const distanceValue = document.getElementById('distanceValue');
+const resolvedDestinationValue = document.getElementById('resolvedDestinationValue');
+const totalDistanceValue = document.getElementById('totalDistanceValue');
 const mapContainer = document.getElementById('map');
 
 import { field as geomagneticField } from 'https://cdn.jsdelivr.net/npm/geomag@1.0.0/dist/geomag.m.js';
@@ -46,6 +48,7 @@ let mapsReady = false;
 let RouteClass = null;
 let MapClass = null;
 let MarkerClass = null;
+let PlaceClass = null;
 let routeSteps = null;
 let currentStepIndex = 0;
 let watchId = null;
@@ -587,6 +590,8 @@ function stopNavigation() {
   destinationInput.disabled = false;
   clearRouteFromMap();
   setNavUi();
+  resolvedDestinationValue.textContent = '—';
+  totalDistanceValue.textContent = '—';
   updateStatus();
 }
 
@@ -629,20 +634,67 @@ function updateNavigation() {
   updateStatus();
 }
 
+const DESTINATION_SEARCH_RADIUS_DEGREES = 0.3;
+
+function formatDistance(meters) {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
+  return `${meters.toFixed(0)} m`;
+}
+
+async function resolveDestination(query, origin) {
+  if (!PlaceClass) return null;
+
+  try {
+    const { places } = await PlaceClass.searchByText({
+      textQuery: query,
+      fields: ['displayName', 'location', 'formattedAddress'],
+      locationBias: new google.maps.LatLngBounds(
+        { lat: origin.lat - DESTINATION_SEARCH_RADIUS_DEGREES, lng: origin.lng - DESTINATION_SEARCH_RADIUS_DEGREES },
+        { lat: origin.lat + DESTINATION_SEARCH_RADIUS_DEGREES, lng: origin.lng + DESTINATION_SEARCH_RADIUS_DEGREES }
+      ),
+      maxResultCount: 1,
+    });
+
+    if (!places.length) return null;
+
+    const place = places[0];
+    return {
+      lat: place.location.lat(),
+      lng: place.location.lng(),
+      label: place.displayName || place.formattedAddress,
+    };
+  } catch (error) {
+    console.warn('Place search failed:', error);
+    return null;
+  }
+}
+
 async function requestDirections() {
-  const destination = destinationInput.value.trim();
-  if (!destination || !currentLocation || !RouteClass) return;
+  const destinationQuery = destinationInput.value.trim();
+  if (!destinationQuery || !currentLocation || !RouteClass) return;
 
   getDirectionsButton.disabled = true;
   nextStepValue.textContent = 'Finding route…';
+  resolvedDestinationValue.textContent = '—';
+  totalDistanceValue.textContent = '—';
+
+  const origin = { lat: currentLocation.latitude, lng: currentLocation.longitude };
+  const resolvedDestination = await resolveDestination(destinationQuery, origin);
+
+  if (!resolvedDestination) {
+    nextStepValue.textContent = 'No route found';
+    speak('No route found for that address');
+    getDirectionsButton.disabled = !(mapsReady && currentLocation);
+    return;
+  }
 
   let response;
   try {
     response = await RouteClass.computeRoutes({
-      origin: { lat: currentLocation.latitude, lng: currentLocation.longitude },
-      destination,
+      origin,
+      destination: { lat: resolvedDestination.lat, lng: resolvedDestination.lng },
       travelMode: google.maps.TravelMode.WALKING,
-      fields: ['legs'],
+      fields: ['legs', 'distanceMeters'],
     });
   } catch (error) {
     console.warn('Directions request failed:', error);
@@ -659,8 +711,10 @@ async function requestDirections() {
   routeSteps = response.routes[0].legs[0].steps;
   destinationInput.disabled = true;
   cancelRouteButton.disabled = false;
+  resolvedDestinationValue.textContent = resolvedDestination.label;
+  totalDistanceValue.textContent = formatDistance(response.routes[0].distanceMeters);
+  speak(`Routing to ${resolvedDestination.label}, ${formatDistance(response.routes[0].distanceMeters)} away`, { force: true });
 
-  const origin = { lat: currentLocation.latitude, lng: currentLocation.longitude };
   ensureMap(origin);
   drawRoute(routeSteps, origin);
 
@@ -689,14 +743,16 @@ cancelRouteButton.addEventListener('click', () => {
 
 loadGoogleMaps()
   .then(async () => {
-    const [routesLib, mapsLib, markerLib] = await Promise.all([
+    const [routesLib, mapsLib, markerLib, placesLib] = await Promise.all([
       google.maps.importLibrary('routes'),
       google.maps.importLibrary('maps'),
       google.maps.importLibrary('marker'),
+      google.maps.importLibrary('places'),
     ]);
     RouteClass = routesLib.Route;
     MapClass = mapsLib.Map;
     MarkerClass = markerLib.Marker;
+    PlaceClass = placesLib.Place;
     mapsReady = true;
     maybeEnableDirectionsButton();
   })
