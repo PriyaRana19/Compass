@@ -163,7 +163,7 @@ function getScreenOrientationAngle() {
 
 function getDeviceHeading(event) {
   if (typeof event.webkitCompassHeading === 'number') {
-    return { heading: normalizeAngle(event.webkitCompassHeading + 180), isTrueNorth: false };
+    return { heading: normalizeAngle(event.webkitCompassHeading), isTrueNorth: false };
   }
 
   if (typeof event.alpha !== 'number') {
