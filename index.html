@@ -16,6 +16,10 @@
     <section class="status-card" aria-labelledby="status-heading">
       <h2 id="status-heading">Compass status</h2>
       <div class="status-row">
+        <strong>Your location</strong>
+        <span id="locationValue" aria-live="polite">—</span>
+      </div>
+      <div class="status-row">
         <strong>Current heading</strong>
         <span id="headingValue" aria-live="polite">—</span>
       </div>
@@ -49,6 +53,23 @@
       <button id="enableButton" class="primary-button" aria-label="Enable orientation sensor">Enable orientation</button>
       <button id="setTargetButton" class="secondary-button" disabled aria-label="Set current heading as target">Set target to current heading</button>
       <button id="muteButton" class="secondary-button" disabled aria-label="Mute or unmute sound">Mute sound</button>
+    </section>
+
+    <section class="nav-card" aria-labelledby="nav-heading">
+      <h2 id="nav-heading">Walk to a destination</h2>
+      <label for="destinationInput" class="visually-hidden">Destination address</label>
+      <input id="destinationInput" type="text" placeholder="Enter a destination address" autocomplete="off" />
+      <button id="getDirectionsButton" class="primary-button" disabled aria-label="Get walking directions">Get directions</button>
+      <div id="map" role="img" aria-label="Map showing your route to the destination"></div>
+      <div class="status-row">
+        <strong>Next step</strong>
+        <span id="nextStepValue" aria-live="polite">—</span>
+      </div>
+      <div class="status-row">
+        <strong>Distance remaining</strong>
+        <span id="distanceValue" aria-live="polite">—</span>
+      </div>
+      <button id="cancelRouteButton" class="secondary-button" disabled aria-label="Cancel navigation">Cancel navigation</button>
     </section>
 
     <section class="hint-card">

@@ -1,3 +1,4 @@
+const locationValue = document.getElementById('locationValue');
 const headingValue = document.getElementById('headingValue');
 const cardinalValue = document.getElementById('cardinalValue');
 const targetValue = document.getElementById('targetValue');
@@ -8,8 +9,15 @@ const directionValue = document.getElementById('directionValue');
 const enableButton = document.getElementById('enableButton');
 const setTargetButton = document.getElementById('setTargetButton');
 const muteButton = document.getElementById('muteButton');
+const destinationInput = document.getElementById('destinationInput');
+const getDirectionsButton = document.getElementById('getDirectionsButton');
+const cancelRouteButton = document.getElementById('cancelRouteButton');
+const nextStepValue = document.getElementById('nextStepValue');
+const distanceValue = document.getElementById('distanceValue');
+const mapContainer = document.getElementById('map');
 
 import { field as geomagneticField } from 'https://cdn.jsdelivr.net/npm/geomag@1.0.0/dist/geomag.m.js';
+import { GOOGLE_MAPS_API_KEY } from './config.js';
 
 let audioContext;
 let oscillator;
@@ -26,12 +34,31 @@ let currentLocation = null;
 let declinationOffset = 0;
 let declinationStatusMessage = '';
 
+let mapsReady = false;
+let RouteClass = null;
+let MapClass = null;
+let MarkerClass = null;
+let routeSteps = null;
+let currentStepIndex = 0;
+let watchId = null;
+const ARRIVAL_RADIUS_METERS = 20;
+
+let map = null;
+let originMarker = null;
+let destinationMarker = null;
+let routePolyline = null;
+
 const cardinalPoints = [
   { name: 'N', angle: 0 },
   { name: 'E', angle: 90 },
   { name: 'S', angle: 180 },
   { name: 'W', angle: 270 },
 ];
+
+function updateLocationDisplay(latitude, longitude, accuracy) {
+  const accuracyText = typeof accuracy === 'number' ? ` (±${accuracy.toFixed(0)} m)` : '';
+  locationValue.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}${accuracyText}`;
+}
 
 async function getLocation() {
   if (!navigator.geolocation) {
@@ -45,6 +72,8 @@ async function getLocation() {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
+
+        updateLocationDisplay(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
 
         declinationOffset = getDeclination(
           currentLocation.latitude,
@@ -349,6 +378,7 @@ async function enableCompass() {
 
   try {
     await getLocation();
+    maybeEnableDirectionsButton();
   } catch (error) {
     console.warn('Unable to access location:', error);
   }
@@ -372,3 +402,223 @@ muteButton.addEventListener('click', () => {
   updateStatus();
 });
 
+function loadGoogleMaps() {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry`;
+    script.async = true;
+    script.defer = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+    document.head.appendChild(script);
+  });
+}
+
+function maybeEnableDirectionsButton() {
+  getDirectionsButton.disabled = !(mapsReady && currentLocation);
+}
+
+function ensureMap(center) {
+  if (map) return;
+  map = new MapClass(mapContainer, {
+    center,
+    zoom: 17,
+    disableDefaultUI: true,
+    zoomControl: true,
+    clickableIcons: false,
+  });
+  originMarker = new MarkerClass({
+    map,
+    position: center,
+    title: 'You',
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 8,
+      fillColor: '#4285F4',
+      fillOpacity: 1,
+      strokeColor: '#ffffff',
+      strokeWeight: 2,
+    },
+  });
+}
+
+function drawRoute(steps, origin) {
+  const path = [];
+  steps.forEach(step => {
+    if (Array.isArray(step.path) && step.path.length) {
+      step.path.forEach(point => path.push({ lat: point.lat, lng: point.lng }));
+    } else {
+      path.push(step.startLocation, step.endLocation);
+    }
+  });
+
+  if (routePolyline) routePolyline.setMap(null);
+  routePolyline = new google.maps.Polyline({
+    path,
+    map,
+    strokeColor: '#2f85f3',
+    strokeWeight: 5,
+    strokeOpacity: 0.9,
+  });
+
+  const destination = steps[steps.length - 1].endLocation;
+  if (destinationMarker) destinationMarker.setMap(null);
+  destinationMarker = new MarkerClass({ map, position: destination, title: 'Destination' });
+
+  const bounds = new google.maps.LatLngBounds();
+  path.forEach(point => bounds.extend(point));
+  bounds.extend(origin);
+  map.fitBounds(bounds, 40);
+}
+
+function updateOriginMarker(position) {
+  if (originMarker) originMarker.setPosition(position);
+}
+
+function clearRouteFromMap() {
+  if (routePolyline) {
+    routePolyline.setMap(null);
+    routePolyline = null;
+  }
+  if (destinationMarker) {
+    destinationMarker.setMap(null);
+    destinationMarker = null;
+  }
+}
+
+function primaryInstruction(instructions) {
+  return instructions.split('\n')[0];
+}
+
+function setNavUi({ nextStep, distance } = {}) {
+  nextStepValue.textContent = nextStep ?? '—';
+  distanceValue.textContent = distance ?? '—';
+}
+
+function stopNavigation() {
+  routeSteps = null;
+  currentStepIndex = 0;
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  targetBearing = null;
+  cancelRouteButton.disabled = true;
+  getDirectionsButton.disabled = !(mapsReady && currentLocation);
+  destinationInput.disabled = false;
+  clearRouteFromMap();
+  setNavUi();
+  updateStatus();
+}
+
+function advanceToStep(index) {
+  currentStepIndex = index;
+
+  if (!routeSteps || currentStepIndex >= routeSteps.length) {
+    speak('You have arrived at your destination');
+    setNavUi({ nextStep: 'Arrived', distance: '0 m' });
+    stopNavigation();
+    return;
+  }
+
+  const instruction = primaryInstruction(routeSteps[currentStepIndex].instructions);
+  nextStepValue.textContent = instruction;
+  speak(instruction);
+}
+
+function updateNavigation() {
+  if (!routeSteps || !currentLocation) return;
+
+  const step = routeSteps[currentStepIndex];
+  if (!step) return;
+
+  const here = new google.maps.LatLng(currentLocation.latitude, currentLocation.longitude);
+  const stepEnd = new google.maps.LatLng(step.endLocation.lat, step.endLocation.lng);
+
+  updateOriginMarker({ lat: currentLocation.latitude, lng: currentLocation.longitude });
+
+  const distanceMeters = google.maps.geometry.spherical.computeDistanceBetween(here, stepEnd);
+  distanceValue.textContent = `${distanceMeters.toFixed(0)} m`;
+
+  if (distanceMeters <= ARRIVAL_RADIUS_METERS) {
+    advanceToStep(currentStepIndex + 1);
+    return;
+  }
+
+  const bearing = google.maps.geometry.spherical.computeHeading(here, stepEnd);
+  targetBearing = normalizeAngle(bearing);
+  updateStatus();
+}
+
+async function requestDirections() {
+  const destination = destinationInput.value.trim();
+  if (!destination || !currentLocation || !RouteClass) return;
+
+  getDirectionsButton.disabled = true;
+  nextStepValue.textContent = 'Finding route…';
+
+  let response;
+  try {
+    response = await RouteClass.computeRoutes({
+      origin: { lat: currentLocation.latitude, lng: currentLocation.longitude },
+      destination,
+      travelMode: google.maps.TravelMode.WALKING,
+      fields: ['legs'],
+    });
+  } catch (error) {
+    console.warn('Directions request failed:', error);
+    response = null;
+  }
+
+  if (!response || !response.routes.length) {
+    nextStepValue.textContent = 'No route found';
+    speak('No route found for that address');
+    getDirectionsButton.disabled = !(mapsReady && currentLocation);
+    return;
+  }
+
+  routeSteps = response.routes[0].legs[0].steps;
+  destinationInput.disabled = true;
+  cancelRouteButton.disabled = false;
+
+  const origin = { lat: currentLocation.latitude, lng: currentLocation.longitude };
+  ensureMap(origin);
+  drawRoute(routeSteps, origin);
+
+  advanceToStep(0);
+
+  watchId = navigator.geolocation.watchPosition(
+    position => {
+      currentLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      updateLocationDisplay(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+      updateNavigation();
+    },
+    error => console.warn('Navigation position error:', error),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+  );
+}
+
+getDirectionsButton.addEventListener('click', requestDirections);
+
+cancelRouteButton.addEventListener('click', () => {
+  speak('Navigation cancelled');
+  stopNavigation();
+});
+
+loadGoogleMaps()
+  .then(async () => {
+    const [routesLib, mapsLib, markerLib] = await Promise.all([
+      google.maps.importLibrary('routes'),
+      google.maps.importLibrary('maps'),
+      google.maps.importLibrary('marker'),
+    ]);
+    RouteClass = routesLib.Route;
+    MapClass = mapsLib.Map;
+    MarkerClass = markerLib.Marker;
+    mapsReady = true;
+    maybeEnableDirectionsButton();
+  })
+  .catch(error => console.warn(error));
