@@ -177,7 +177,7 @@ function updateStatus() {
 
   const error = computeAngularError(currentHeading, targetBearing);
   const absError = Math.abs(error);
-  const direction = error === 0 ? 'On target' : error > 0 ? 'Turn right' : 'Turn left';
+  const direction = error === 0 ? 'On target' : error > 0 ? 'Turn left' : 'Turn right';
   errorValue.textContent = `${error.toFixed(0)}°`;
   directionValue.textContent = direction;
 
