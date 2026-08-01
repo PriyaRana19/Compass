@@ -8,6 +8,9 @@ const enableButton = document.getElementById('enableButton');
 const setTargetButton = document.getElementById('setTargetButton');
 const muteButton = document.getElementById('muteButton');
 
+import Geomag from 'geomag';
+const declination = new Geomag().declination(lat, lon, new Date());
+
 let audioContext;
 let oscillator;
 let gainNode;
@@ -15,6 +18,9 @@ let currentHeading = null;
 let targetBearing = null;
 let isMuted = false;
 let lastVibrationState = null;
+let currentLocation = null;
+let declinationOffset = 0; 
+let declinationStatusMessage = '';
 
 const cardinalPoints = [
   { name: 'N', angle: 0 },
@@ -23,8 +29,50 @@ const cardinalPoints = [
   { name: 'W', angle: 270 },
 ];
 
+async function getLocation() {
+  if (!navigator.geolocation) {
+    throw new Error('Geolocation is not supported by this browser.');
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      async position => {
+        currentLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+
+        declinationOffset = getDeclination(
+          currentLocation.latitude,
+          currentLocation.longitude
+        );
+
+        declinationStatusMessage = Math.abs(declinationOffset) > 0.0001
+          ? `Location: ${currentLocation.latitude.toFixed(5)}, ${currentLocation.longitude.toFixed(5)}. Using true north (${declinationOffset.toFixed(1)}° declination).`
+          : `Location: ${currentLocation.latitude.toFixed(5)}, ${currentLocation.longitude.toFixed(5)}. Using the default heading.`;
+
+        resolve(currentLocation);
+      },
+      error => {
+        declinationStatusMessage = 'Location unavailable; using magnetic north.';
+        reject(error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 30000,
+        timeout: 20000,
+      }
+    );
+  });
+}
+
+
 function normalizeAngle(angle) {
-  return (angle % 360)
+  return ((angle % 360) + 360) % 360;
+}
+
+function getTrueHeading(magneticHeading, declination) {
+  return normalizeAngle(magneticHeading + declination);
 }
 
 function computeAngularError(current, target) {
@@ -187,7 +235,7 @@ function handleOrientation(event) {
   if (typeof event.webkitCompassHeading === 'number') {
     heading = event.webkitCompassHeading;
   } else if (typeof event.alpha === 'number') {
-    heading = 360 - event.alpha;
+    heading = event.alpha;
   }
 
   if (heading === null || Number.isNaN(heading)) {
@@ -195,7 +243,7 @@ function handleOrientation(event) {
     return;
   }
 
-  currentHeading = normalizeAngle(heading);
+  currentHeading = getTrueHeading(heading, declinationOffset);
   updateStatus();
   setTargetButton.disabled = false;
   muteButton.disabled = false;
@@ -225,8 +273,14 @@ async function enableCompass() {
     }
   }
 
+  try {
+    await getLocation();
+  } catch (error) {
+    console.warn('Unable to access location:', error);
+  }
+
   window.addEventListener('deviceorientation', handleOrientation, true);
-  stateValue.textContent = 'Waiting for compass data...';
+  stateValue.textContent = declinationStatusMessage || 'Waiting for compass data...';
   enableButton.disabled = true;
 }
 
