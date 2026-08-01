@@ -466,6 +466,7 @@ async function enableCompass() {
     console.warn('Unable to access location:', error);
   }
 
+  ensureAudioContext();
   window.addEventListener('deviceorientation', handleOrientation, true);
   stateValue.textContent = declinationStatusMessage || 'Waiting for compass data...';
   enableButton.disabled = true;
